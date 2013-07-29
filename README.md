@@ -22,4 +22,6 @@ sudo perl -MCPAN -e '\
         
 _usage_
 
-perl threaded_mp3_encoder.pl
+perl threaded_mp3_encoder.pl <source-directory> <target-directory>
+
+![screenshot](https://github.com/lkwg82/threaded-mp3-transcoder/blob/master/screenshot.png?raw=true "Optional title")
