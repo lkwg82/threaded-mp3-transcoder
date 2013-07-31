@@ -251,16 +251,10 @@ sub show_summary {
 			"files",
 			(
 				$stats->{ $ref->{'source_dir'} }{'files'} ==  $stats->{ $ref->{'dest_dir'} }{'files'}
-			  ) ? "equal ("
-			  . $stats->{ $ref->{'source_dir'} }{'files'} . ")"
-			: $stats->{ $ref->{'source_dir'} }{'files'} . ":"
-			  . $stats->{ $ref->{'dest_dir'} }{'files'}
+			  ) ? "equal (". $stats->{ $ref->{'source_dir'} }{'files'} . ")"
+			  : $stats->{ $ref->{'source_dir'} }{'files'} . ":". $stats->{ $ref->{'dest_dir'} }{'files'}
 		  )
-		  . sprintf(
-			"%s   %5s - %5s \n",
-			"size",
-			&format( $stats->{ $ref->{'source_dir'} }{'size'} ),
-			&format( $stats->{ $ref->{'dest_dir'} }{'size'} )
+		  . sprintf("%s   %5s - %5s \n","size",&format( $stats->{ $ref->{'source_dir'} }{'size'} ),&format( $stats->{ $ref->{'dest_dir'} }{'size'} )
 		  )
 		  . "\n"
 		  . sprintf(
