@@ -418,10 +418,11 @@ sub copy_reencode_copy {
 	my $src     = shift || die "need file to process \n";
 
 	my $result;
-	( my $dest = $$src ) =~ s/^$CONFIG->{'source_dir'}/$CONFIG->{'dest_dir'}/o;
+	(my $dest = $$src ) =~ s/^$CONFIG->{'source_dir'}/$CONFIG->{'dest_dir'}\//o;
+	$dest =~ s/\/+/\//o;
 
 	if ( !$CONFIG->{'overwrite'} && ( -e $dest ) ) {
-		log_debug('file already existing');
+		log_debug("file already existing:$dest");
 		return 1;
 	}
 
