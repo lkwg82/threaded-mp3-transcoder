@@ -84,39 +84,23 @@ else{
 	exit 1;
 }
 
-if ( &ask_for_paths( @ARGV ) ) {
+if ( ($ARGV[0] ne $ARGV[1]) && &ask_for_paths( @ARGV ) ) {
 	$CONFIG->{'source_dir'} = $ARGV[0];
 	$CONFIG->{'dest_dir'} = $ARGV[1];
+
+  die "source dir does not exist \"" . $CONFIG->{'source_dir'} . "\" \n" unless ( -d $CONFIG->{'source_dir'} );
+  &mkdir( $CONFIG->{'dest_dir'} ) unless ( -d $CONFIG->{'dest_dir'} );
 }
 else{
 	exit;
 }
 
+# create a thread to create listing of source dir
+$threads->{'lister'} = Thread->new( \&create_listing, ( $CONFIG->{'source_dir'}, \$listing ) );
+$threads->{'lister'}->join();
+$listing_complete = 1;
 
-# Argumente verarbeiten
-die "source dir does not exist \"" . $CONFIG->{'source_dir'} . "\" \n" unless ( -d $CONFIG->{'source_dir'} );
-
-if ( $ARGV[0] ne $ARGV[1] ) {
-  $CONFIG->{'source_dir'} = $ARGV[0];
-  $CONFIG->{'dest_dir'}   = $ARGV[1];
-}
-else {
-  die "klappt nicht";
-}
-
-&mkdir( $CONFIG->{'dest_dir'} ) unless ( -d $CONFIG->{'dest_dir'} );
-
-{
-	# create a thread to create listing of source dir
-	$threads->{'lister'} =
-	  Thread->new( \&create_listing, ( $CONFIG->{'source_dir'}, \$listing ) );
-
-	$threads->{'lister'}->join();
-	$listing_complete = 1;
-};
-
-$threads->{'status'} =
-  Thread->new( \&status, ( \%running, \$listing, \%thread_limits ) );
+$threads->{'status'} =  Thread->new( \&status, ( \%running, \$listing, \%thread_limits ) );
 
 sleep(1);
 
@@ -141,9 +125,7 @@ sub ask_for_paths{
                                           modal => 1,
                                           no_separator => 0 );
 
-	my $r = ask Gtk2::Ex::Dialogs::Question ( "Should I convert all from \n $source \n to \n $dest ?" );
-
-	return $r;
+	return ask Gtk2::Ex::Dialogs::Question ( "Should I convert all from \n $source \n to \n $dest ?" );
 }
 
 sub show_summary {
@@ -170,7 +152,6 @@ sub show_summary {
 		}
 		else {
 			print "unknown type $item \n";
-
 		}
 	}
 
@@ -206,14 +187,12 @@ sub show_summary {
 		$stats->{ $ref->{'source_dir'} }->{'list'}
 	);
 
-	my $diff_text;
+	my $diff_text  = "left: " .$diff->{'left'} ."\n" ;
+	$diff_text    .= "right: " . $diff->{'right'} ."\n" ;
 
-	$diff_text = "left: " + $diff->{'left'} + "\n" ;
-	$diff_text .= "right: " + $diff->{'right'} + "\n" ;
-
-	$diff_text .= " added [ \n";
+	$diff_text    .= " added [ \n";
 	grep{ $diff_text .=  "  ".$_."\n"; }@{$diff->{'added'}};
-	$diff_text .= "] \n";
+	$diff_text    .= "] \n";
 
 
 	$diff_text .= " deleted [ \n";
@@ -330,11 +309,10 @@ sub threads_status {
 sub thread_setStatus {
 	my $running_ref = shift || die "need ref to running\n";
 	my $status      = shift || die "no status given \n";
-
-	{
-		lock($running_ref);
-		$running_ref->{ Thread->self->tid } = $status;
-	}
+	
+  lock($running_ref);
+	$running_ref->{ Thread->self->tid } = $status;
+	
 	&log_debug( $running_ref->{ Thread->self->tid } );
 }
 
