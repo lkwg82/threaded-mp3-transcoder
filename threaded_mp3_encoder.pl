@@ -47,17 +47,7 @@ our $CONFIG = {
 	'dest_dir'   => '',
 	'overwrite' => 0,                 # 0|1
 	'threads'   => \%thread_limits,
-
-	#~ {
-	#~ 'total'		=>	8,
-	#~ 'encoding'	=>	2,	# number = cpu cores + 1
-	#~ 'copying'	=>	6,	#
-	#~ 'wait_for'	=>{		# s
-	#~ 'copy'	=>	'1',
-	#~ 'encode'=>	'1'
-	#~ }
-	#~ },
-	'debug'    => 0,                  # 0|1 increase logging
+	'debug'    => 1,                  # 0|1 increase logging
 	'lame_bin' => 'lame',
 	'lame_par' => join(
 		' ',
@@ -79,23 +69,24 @@ our $CONFIG = {
 	)
 };
 
-if ( scalar(@ARGV) >= 2 ){
-	map{		
+if ( scalar(@ARGV) == 2 ){
+	map{
 		unless( /^\// ){
-			my $path=`pwd`; 
-			chomp($path); 
+			my $path=`pwd`;
+			chomp($path);
 			$_ = $path.'/'.$_;
 		}
-	}@ARGV;  
+	}@ARGV;
 }
 else{
-	exit;
+  print "\ncall misses some arguments\n";
+	print "call $0 <source directory> <destination directory>\n";
+	exit 1;
 }
 
-if ( &ask_for_paths( @ARGV ) ) {	
-	
+if ( &ask_for_paths( @ARGV ) ) {
 	$CONFIG->{'source_dir'} = $ARGV[0];
-	$CONFIG->{'dest_dir'} = $ARGV[1]; 
+	$CONFIG->{'dest_dir'} = $ARGV[1];
 }
 else{
 	exit;
@@ -103,23 +94,19 @@ else{
 
 
 # Argumente verarbeiten
-if ( scalar(@ARGV) == 2 ) {
+die "source dir does not exist \"" . $CONFIG->{'source_dir'} . "\" \n" unless ( -d $CONFIG->{'source_dir'} );
 
-	if ( ( -d $ARGV[0] ) && ( $ARGV[0] ne $ARGV[1] ) ) {
-		$CONFIG->{'source_dir'} = $ARGV[0];
-		$CONFIG->{'dest_dir'}   = $ARGV[1];
-	}
-	else {
-		die "klappt nicht";
-	}
+if ( $ARGV[0] ne $ARGV[1] ) {
+  $CONFIG->{'source_dir'} = $ARGV[0];
+  $CONFIG->{'dest_dir'}   = $ARGV[1];
+}
+else {
+  die "klappt nicht";
 }
 
-die "source dir does not exist \"" . $CONFIG->{'source_dir'} . "\" \n"
-  unless ( -e $CONFIG->{'source_dir'} );
 &mkdir( $CONFIG->{'dest_dir'} ) unless ( -d $CONFIG->{'dest_dir'} );
 
 {
-
 	# create a thread to create listing of source dir
 	$threads->{'lister'} =
 	  Thread->new( \&create_listing, ( $CONFIG->{'source_dir'}, \$listing ) );
@@ -149,13 +136,13 @@ $threads->{'status'}->join();
 
 sub ask_for_paths{
 	my ($source,$dest) = @_;
-	
+
 	use Gtk2::Ex::Dialogs::Question ( destroy_with_parent => 1,
                                           modal => 1,
                                           no_separator => 0 );
-	
+
 	my $r = ask Gtk2::Ex::Dialogs::Question ( "Should I convert all from \n $source \n to \n $dest ?" );
-	
+
 	return $r;
 }
 
@@ -214,25 +201,25 @@ sub show_summary {
 
 	#print Data::Dumper::Dumper($stats);
 
-	my $diff = &array_diff(		
+	my $diff = &array_diff(
 		$stats->{ $ref->{'dest_dir'} }->{'list'},
 		$stats->{ $ref->{'source_dir'} }->{'list'}
 	);
-	
+
 	my $diff_text;
-	
+
 	$diff_text = "left: " + $diff->{'left'} + "\n" ;
 	$diff_text .= "right: " + $diff->{'right'} + "\n" ;
-	
+
 	$diff_text .= " added [ \n";
 	grep{ $diff_text .=  "  ".$_."\n"; }@{$diff->{'added'}};
 	$diff_text .= "] \n";
-	
+
 
 	$diff_text .= " deleted [ \n";
 	grep{ $diff_text .=  "  ".$_."\n"; }@{$diff->{'deleted'}};
 	$diff_text .= "] \n";
-	
+
 	use Gtk2 '-init';
 	use Gtk2 qw/-init -threads-init 1.050/;
 
@@ -252,23 +239,18 @@ sub show_summary {
 		    $ref->{'source_dir'} . "\n"
 		  . $ref->{'dest_dir'} . "\n"
 		  . sprintf( "%s\n", "-" x 50 )
-		  . sprintf(
-			"%s   %s \n",
-			"dirs",
+		  . sprintf("%s   %s \n",	"dirs",
 			(
-				$stats->{ $ref->{'source_dir'} }{'dirs'} ==
-				  $stats->{ $ref->{'dest_dir'} }{'dirs'}
-			  ) ? "equal ("
-			  . $stats->{ $ref->{'source_dir'} }{'dirs'} . ")"
-			: $stats->{ $ref->{'source_dir'} }{'dirs'} . ":"
-			  . $stats->{ $ref->{'dest_dir'} }{'dirs'}
+				$stats->{ $ref->{'source_dir'} }{'dirs'} == $stats->{ $ref->{'dest_dir'} }{'dirs'}
+			  ) ?
+				"equal (" . $stats->{ $ref->{'source_dir'} }{'dirs'} . ")" :
+				$stats->{ $ref->{'source_dir'} }{'dirs'} . ":" . $stats->{ $ref->{'dest_dir'} }{'dirs'}
 		  )
 		  . sprintf(
 			"%s   %s \n",
 			"files",
 			(
-				$stats->{ $ref->{'source_dir'} }{'files'} ==
-				  $stats->{ $ref->{'dest_dir'} }{'files'}
+				$stats->{ $ref->{'source_dir'} }{'files'} ==  $stats->{ $ref->{'dest_dir'} }{'files'}
 			  ) ? "equal ("
 			  . $stats->{ $ref->{'source_dir'} }{'files'} . ")"
 			: $stats->{ $ref->{'source_dir'} }{'files'} . ":"
@@ -284,8 +266,7 @@ sub show_summary {
 		  . sprintf(
 			"%s   reducted to %.2f%% \n",
 			"benefit",
-			$stats->{ $ref->{'dest_dir'} }{'size'} /
-			  $stats->{ $ref->{'source_dir'} }{'size'} * 100
+			$stats->{ $ref->{'dest_dir'} }{'size'} / 			  $stats->{ $ref->{'source_dir'} }{'size'} * 100
 		  )."\n".$diff_text
 	);
 
@@ -294,19 +275,17 @@ sub show_summary {
 	my $pane = Gtk2::VPaned->new;
 	$pane->set_position(50);
 	$window2->add($pane);
-	
-	
+
+
 	$pane->add($button_ok);
 	$pane->add($label_test);
 
 	# all in one go
 	$window2->show_all;
 
-	
+	#print Dumper($diff);
 
-	print Dumper($diff);
-	
-	print "total:",scalar( @{$stats->{ $ref->{'source_dir'} }->{'list'}}),"\n";	
+	print "total:",scalar( @{$stats->{ $ref->{'source_dir'} }->{'list'}}),"\n";
 	Gtk2->main;
 	exit 0;
 }
@@ -331,7 +310,7 @@ sub threads_copying {
 # number of threads in state encoding
 # return int
 sub threads_encoding {
-	my $running_ref = shift || die "need ref to running\n";	
+	my $running_ref = shift || die "need ref to running\n";
 	return &threads_status( $running_ref, 'e' );
 }
 
@@ -405,13 +384,10 @@ sub do_it {
 			{
 				lock $running_ref;
 				$file = $$list_ref->dequeue();
-				log_debug(
-					"running: " . $$list_ref->pending() . " left - $file \n" );
+				log_debug("running: " . $$list_ref->pending() . " left - $file \n" );
 			}
 
-			unless ( &copy_reencode_copy( $running_ref, \$file ) ) {
-				die("processing $file failed\n");
-			}
+			die("processing $file failed\n") unless ( &copy_reencode_copy( $running_ref, \$file ) );
 		}
 	}
 }
@@ -522,10 +498,8 @@ sub copy_reencode_copy {
 			);
 
 			log_debug('copying failed') unless ($result);
-			unlink($tempfile_src)
-			  || die "could not delete $tempfile_src \n $^E \n";
-			unlink($tempfile_dest)
-			  || die "could not delete $tempfile_dest \n $^E \n";
+			unlink($tempfile_src)  || die "could not delete $tempfile_src \n $^E \n";
+			unlink($tempfile_dest) || die "could not delete $tempfile_dest \n $^E \n";
 		}
 	}
 
@@ -547,9 +521,6 @@ sub create_listing {
 		sub {
 			my $path = $File::Find::name;
 
-			#$path =~ s/([\ \[\]\(\)])/\_/g;
-			#print $path,"\n";
-
 			${$list}->enqueue($File::Find::name);
 		},
 		($dir)
@@ -563,15 +534,13 @@ sub create_listing {
 
 # --------------------------------------------------------------------------------------------------------------------
 # create recursivly the directory #1
-# return boolean
+# void
 sub mkdir {
 	my $dir = shift || die "no directory given\n";
 	eval { mkpath($dir) };
 	if ($@) {
-		print "Couldn't create $dir: $@";
+		die "Couldn't create $dir: $@";
 	}
-
-	return ( defined $@ ? 0 : 1 );
 }
 
 # --------------------------------------------------------------------------------------------------------------------
@@ -596,7 +565,6 @@ sub encode {
 
 		$success = `$cmd && echo 1 || echo 0`;
 
-		#print $cmd,"\n";
 	} until ( ( $eCount++ == $eLimit ) || $success );
 
 	return ( $eCount <= $eLimit );
@@ -731,11 +699,9 @@ sub status {
 	$hbox->add($spin_encoder);
 
 	my $label_copyier = Gtk2::Label->new('copier');
-	my $spin_copyier  =
-	  Gtk2::SpinButton->new_with_range( 0, $thread_limits->{'total'}, 1 );
+	my $spin_copyier  = Gtk2::SpinButton->new_with_range( 0, $thread_limits->{'total'}, 1 );
 	$spin_copyier->set_value( $thread_limits->{'copying'} );
-	$spin_copyier->signal_connect(
-		value_changed => \&on_spinbutton_copyier_value_changed );
+	$spin_copyier->signal_connect(value_changed => \&on_spinbutton_copyier_value_changed );
 
 	$hbox->add($label_copyier);
 	$hbox->add($spin_copyier);
@@ -745,8 +711,7 @@ sub status {
 	my $label_prio = Gtk2::Label->new('priority');
 	my $spin_prio = Gtk2::SpinButton->new_with_range( 0, 20, 1 );
 	$spin_prio->set_value( $thread_limits->{'priority'} );
-	$spin_prio->signal_connect(
-		value_changed => \&on_spinbutton_prio_value_changed );
+	$spin_prio->signal_connect(value_changed => \&on_spinbutton_prio_value_changed );
 
 	if ( $^O =~ /linux/ ) {
 		$hbox->add($label_prio);
@@ -774,10 +739,8 @@ sub status {
 	}
 
 	sub on_spinbutton_prio_value_changed {
-
-		#~ lock($thread_limits);
 		$thread_limits->{'priority'} = $_[0]->get_value;
-		
+
 	}
 
 	sub on_spinbutton_copyier_value_changed {
@@ -796,8 +759,7 @@ sub status {
 
 	sub _worker_ {
 
-		grep { push( @{ $slist->{data} }, [ 0, undef, undef ] ); }
-		  1 .. $CONFIG->{'threads'}->{'total'};
+		grep { push( @{ $slist->{data} }, [ 0, undef, undef ] ); } 1 .. $CONFIG->{'threads'}->{'total'};
 		my @keys;
 
 		while (1) {
@@ -861,35 +823,35 @@ sub log_file {
 
 sub array_diff{
 	my ($ar1, $ar2) = @_;
-	
+
 	my $diff	= {
 			'added' 	=> [],
 			'deleted'	=> [],
 			'left'		=> 0,
 			'right'		=> 0
 	};
-	
+
 	my $h1	= {};
 	my $h2 	= {};
-	
+
 	grep{ $h1->{$_} = 1; }@{$ar1};
 	grep{ $h2->{$_} = 1; }@{$ar2};
-	
+
 	grep{
 		if ( !exists($h2->{$_}) ){
 			push( @{$diff->{'deleted'}}, $_ );
-		}	
-		
-		$diff->{'left'}++;	
+		}
+
+		$diff->{'left'}++;
 	}keys %{$h1};
-	
-	
+
+
 	grep{
 		if ( !exists($h1->{$_}) ){
 			push( @{$diff->{'added'}}, $_ );
 		}
 		$diff->{'right'}++;
 	}keys %{$h2};
-	 
-	return $diff;	
+
+	return $diff;
 }
