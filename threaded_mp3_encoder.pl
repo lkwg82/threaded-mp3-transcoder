@@ -65,8 +65,9 @@ our $CONFIG = {
 			              # force  = force MS stereo on all frames.
 			              #'--mp3input',
 
-		)
-	)
+		),	
+	),
+	'mediainfo_bin'	=> 'mediainfo'
 };
 
 if ( scalar(@ARGV) == 2 ){
@@ -439,44 +440,81 @@ sub copy_reencode_copy {
 				\&copy_and_check, [ $$src, $dest ]
 			);
 		}
-		else {
-			my $tempfile_src  = new File::Temp( UNLINK => 0, SUFFIX => '.mp3' );
-			my $tempfile_dest = new File::Temp( UNLINK => 0, SUFFIX => '.mp3' );
+		else {			
+			
+			if (&check_if_vbr($src))
+			{
+				$result = &thread_wait(
+					$running,
+					"c:copying vbr mp3 $$src",
+					"w:waiting for next job",
+					\&copy_and_check, [ $$src, $dest ]
+				);
+			}
+			else{
+				my $tempfile_src  = new File::Temp( UNLINK => 0, SUFFIX => '.mp3' );
+				my $tempfile_dest = new File::Temp( UNLINK => 0, SUFFIX => '.mp3' );
+				$result = &thread_wait(
+					$running,
+					"c:copying from $$src",
+					"w:waiting for encoding",
+					\&copy_and_check, [ $$src, $tempfile_src ]
+				);
 
-			$result = &thread_wait(
-				$running,
-				"c:copying from $$src",
-				"w:waiting for encoding",
-				\&copy_and_check, [ $$src, $tempfile_src ]
-			);
+				log_debug('copying failed') unless ($result);
+				return $result              unless ($result);    # return on error
 
-			log_debug('copying failed') unless ($result);
-			return $result              unless ($result);    # return on error
+				$result = &thread_wait(
+					$running,
+					"e:encoding $$src",
+					"w:waiting for copying back",
+					\&encode, [ $tempfile_src, $tempfile_dest ]
+				);
 
-			$result = &thread_wait(
-				$running,
-				"e:encoding $$src",
-				"w:waiting for copying back",
-				\&encode, [ $tempfile_src, $tempfile_dest ]
-			);
+				log_debug('encoding failed') unless ($result);
+				return $result               unless ($result);    # return on error
 
-			log_debug('encoding failed') unless ($result);
-			return $result               unless ($result);    # return on error
+				$result = &thread_wait(
+					$running,
+					"c:copying to $dest",
+					"w:waiting for next job",
+					\&copy_and_check, [ $tempfile_dest, $dest ]
+				);
 
-			$result = &thread_wait(
-				$running,
-				"c:copying to $dest",
-				"w:waiting for next job",
-				\&copy_and_check, [ $tempfile_dest, $dest ]
-			);
-
-			log_debug('copying failed') unless ($result);
-			unlink($tempfile_src)  || die "could not delete $tempfile_src \n $^E \n";
-			unlink($tempfile_dest) || die "could not delete $tempfile_dest \n $^E \n";
+				log_debug('copying failed') unless ($result);
+				unlink($tempfile_src)  || die "could not delete $tempfile_src \n $^E \n";
+				unlink($tempfile_dest) || die "could not delete $tempfile_dest \n $^E \n";
+			}
 		}
 	}
 
 	return $result;
+}
+# --------------------------------------------------------------------------------------------------------------------
+# check if is already vbr 
+# return boolean
+sub check_if_vbr{
+	my $src = shift || die "need src file as ref";
+	
+	#~ if ( -f "$$src" )
+	{
+		my $arguments = $CONFIG->{'mediainfo_bin'}." '".$$src."'";
+		open(PROG,$arguments."|") || die "error while opening $arguments : $^E\n";
+		
+		print "info $$src\n";
+		my $isConstantBitRate=0;
+		while(<PROG>){
+			if (/^Bit rate mode.*: Constant$/ ){
+				$isConstantBitRate = 1;
+			}
+		}		
+		close(PROG);
+		
+		log_debug (($isConstantBitRate?'const':'vbr  ')." $$src ");
+		return $isConstantBitRate ? 0 : 1;
+	}
+	
+	#~ die "is no file: $$src";	
 }
 
 # --------------------------------------------------------------------------------------------------------------------
@@ -493,7 +531,7 @@ sub create_listing {
 	find(
 		sub {
 			my $path = $File::Find::name;
-
+			log_debug "path: $path";
 			${$list}->enqueue($File::Find::name);
 		},
 		($dir)
