@@ -97,9 +97,8 @@ else{
 }
 
 # create a thread to create listing of source dir
-$threads->{'lister'} = Thread->new( \&create_listing, ( $CONFIG->{'source_dir'}, \$listing ) );
-$threads->{'lister'}->join();
-$listing_complete = 1;
+&create_listing( $CONFIG->{'source_dir'}, \$listing ) ;
+
 
 $threads->{'status'} =  Thread->new( \&status, ( \%running, \$listing, \%thread_limits ) );
 
@@ -108,7 +107,7 @@ sleep(1);
 foreach ( 1 .. $CONFIG->{'threads'}->{'total'} ) {
 	push(
 		@{ $threads->{'workers'} },
-		Thread->new( \&do_it, ( \$listing, \$listing_complete, \%running ) )
+		Thread->new( \&do_it, ( \$listing, \%running ) )
 	);
 }
 
@@ -181,30 +180,11 @@ sub show_summary {
 		print "$current_dir:", $stats->{$current_dir}{'files'}, "\n";
 	} qw/source dest/;
 
-	#print Data::Dumper::Dumper($stats);
-
-	my $diff = &array_diff(
-		$stats->{ $ref->{'dest_dir'} }->{'list'},
-		$stats->{ $ref->{'source_dir'} }->{'list'}
-	);
-
-	my $diff_text  = "left: " .$diff->{'left'} ."\n" ;
-	$diff_text    .= "right: " . $diff->{'right'} ."\n" ;
-
-	$diff_text    .= " added [ \n";
-	grep{ $diff_text .=  "  ".$_."\n"; }@{$diff->{'added'}};
-	$diff_text    .= "] \n";
-
-
-	$diff_text .= " deleted [ \n";
-	grep{ $diff_text .=  "  ".$_."\n"; }@{$diff->{'deleted'}};
-	$diff_text .= "] \n";
 
 	use Gtk2 '-init';
 	use Gtk2 qw/-init -threads-init 1.050/;
 
-	die "Glib::Object thread safetly failed"
-	  unless Glib::Object->set_threadsafe(1);
+	die "Glib::Object thread safetly failed" unless Glib::Object->set_threadsafe(1);
 
 	my $window2 = Gtk2::Window->new;
 	$window2->set_title('finished');
@@ -241,7 +221,7 @@ sub show_summary {
 			"%s   reducted to %.2f%% \n",
 			"benefit",
 			$stats->{ $ref->{'dest_dir'} }{'size'} / 			  $stats->{ $ref->{'source_dir'} }{'size'} * 100
-		  )."\n".$diff_text
+		  )."\n"
 	);
 
 	$button_ok->signal_connect( pressed => sub { Gtk2->main_quit; 1 } );
@@ -331,7 +311,6 @@ sub log_debug{
 # void
 sub do_it {
 	my $list_ref    = shift || die "need a list to enqueue to\n";
-	my $complete    = shift || die "dont know whether listing is complete \n";
 	my $running_ref = shift || die "need running data hash \n";
 
 	my $tid = Thread->self->tid;
@@ -341,16 +320,8 @@ sub do_it {
 
 	while ( !$finished ) {
 		if ( $$list_ref->pending == 0 ) {
-			if ($$complete) {
-				$finished = 1;
-				&thread_setStatus( $running_ref, 'f:finished' );
-
-				#print "($tid) - shutting down, no more work \n";
-			}
-			else {
-				&thread_setStatus( $running_ref, 'w:waiting for listing' );
-				sleep(1);
-			}
+			$finished = 1;
+			&thread_setStatus( $running_ref, 'f:finished' );
 		}
 		else {
 			my $file;
