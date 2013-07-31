@@ -309,17 +309,17 @@ sub threads_status {
 sub thread_setStatus {
 	my $running_ref = shift || die "need ref to running\n";
 	my $status      = shift || die "no status given \n";
-	
+
   lock($running_ref);
 	$running_ref->{ Thread->self->tid } = $status;
-	
+
 	&log_debug( $running_ref->{ Thread->self->tid } );
 }
 
 # --------------------------------------------------------------------------------------------------------------------
 # logging
 # void
-sub log_debug : locked {
+sub log_debug{
 	my $text = shift || die "need text to output \n";
 
 	print "(", Thread->self->tid, ") ", $text, "\n" if ( $CONFIG->{'debug'} );
