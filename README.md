@@ -8,6 +8,14 @@ this wraps 'lame --vbr-new -b 32 -B 320 -m j source-file destination-file'
 
 _installation_
 
+
+
+```
+git clone https://github.com/lkwg82/threaded-mp3-transcoder.git
+```
+
+```
+cd threaded-mp3-transcoder 
 sudo perl -MCPAN -e '\
         install Data::Dumper;\
         install File::Basename;\
@@ -19,7 +27,10 @@ sudo perl -MCPAN -e '\
         install Thread::Queue;\
         install Time::HiRes;\
         install Unix::Process'
-        
+```
+
 _usage_
 
-perl threaded_mp3_encoder.pl
+perl threaded_mp3_encoder.pl <source-directory> <target-directory>
+
+![screenshot](https://github.com/lkwg82/threaded-mp3-transcoder/blob/master/screenshot.png?raw=true "Optional title")
